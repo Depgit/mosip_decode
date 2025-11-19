@@ -115,6 +115,7 @@ async function initializeTables() {
         file_url VARCHAR(500),
         file_type VARCHAR(50),
         file_size BIGINT,
+        original_name VARCHAR(255),
         uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -182,6 +183,70 @@ async function initializeTables() {
       CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at);
     `);
     console.log('✅ Database indexes created');
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS qa_agencies (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        agency_name VARCHAR(255) NOT NULL,
+        certification_number VARCHAR(100) UNIQUE,
+        specialization TEXT[], -- Array of product types they handle
+        max_capacity INTEGER DEFAULT 10, -- Max concurrent inspections
+        current_load INTEGER DEFAULT 0, -- Current active inspections
+        rating DECIMAL(3, 2) DEFAULT 5.00,
+        status VARCHAR(50) DEFAULT 'active', -- active, inactive, suspended
+        address TEXT,
+        contact_email VARCHAR(255),
+        contact_phone VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS inspection_requests (
+        id SERIAL PRIMARY KEY,
+        batch_id INTEGER NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
+        qa_agency_id INTEGER NOT NULL REFERENCES qa_agencies(id),
+        requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        status VARCHAR(50) DEFAULT 'pending', -- pending, accepted, rejected, completed
+        accepted_at TIMESTAMP,
+        rejected_at TIMESTAMP,
+        rejection_reason TEXT,
+        priority VARCHAR(20) DEFAULT 'normal', -- low, normal, high, urgent
+        scheduled_date TIMESTAMP,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(batch_id, qa_agency_id) -- Prevent duplicate requests
+      );
+    `);
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title VARCHAR(255) NOT NULL,
+        message TEXT NOT NULL,
+        type VARCHAR(50) DEFAULT 'info', -- info, warning, success, error
+        reference_type VARCHAR(50), -- batch, inspection, request
+        reference_id INTEGER,
+        read BOOLEAN DEFAULT FALSE,
+        read_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_inspection_requests_batch ON inspection_requests(batch_id);
+      CREATE INDEX IF NOT EXISTS idx_inspection_requests_qa ON inspection_requests(qa_agency_id);
+      CREATE INDEX IF NOT EXISTS idx_inspection_requests_status ON inspection_requests(status);
+      CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+      CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
+      CREATE INDEX IF NOT EXISTS idx_qa_agencies_status ON qa_agencies(status);
+    `);
+
+    console.log('✅ Quality check tables ready');
 
     console.log('🎉 Database initialization complete!');
 
