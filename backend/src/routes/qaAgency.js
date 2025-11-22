@@ -23,7 +23,7 @@ router.get('/requests/pending',
         });
       }
 
-      const qaAgency = qaResult.rows;
+      const qaAgency = qaResult.rows[0];
 
       // Get pending requests
       const requests = await qaAgencyService.getPendingRequests(qaAgency.id);
@@ -65,7 +65,7 @@ router.post('/requests/:requestId/accept',
         });
       }
 
-      const qaAgencyId = qaResult.rows.id;
+      const qaAgencyId = qaResult.rows[0].id;
 
       // Accept request
       const request = await qaAgencyService.acceptRequest(

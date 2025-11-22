@@ -31,7 +31,7 @@ router.post('/', verifyToken, requireRole('qa_agency'), async (req, res, next) =
     res.status(201).json({
       success: true,
       message: 'Inspection submitted successfully',
-      data: result.rows
+      data: result.rows[0]
     });
 
   } catch (err) {

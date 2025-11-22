@@ -238,6 +238,20 @@ async function initializeTables() {
     `);
 
     await query(`
+      CREATE TABLE IF NOT EXISTS verifiable_credentials (
+        id SERIAL PRIMARY KEY,
+        batch_id INTEGER NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
+        qa_agency_id INTEGER NOT NULL REFERENCES qa_agencies(id),
+        vc_data JSONB NOT NULL,
+        qr_code_url TEXT,
+        qr_code_image TEXT,
+        status VARCHAR(50) DEFAULT 'active',
+        issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await query(`
       CREATE INDEX IF NOT EXISTS idx_inspection_requests_batch ON inspection_requests(batch_id);
       CREATE INDEX IF NOT EXISTS idx_inspection_requests_qa ON inspection_requests(qa_agency_id);
       CREATE INDEX IF NOT EXISTS idx_inspection_requests_status ON inspection_requests(status);
@@ -264,10 +278,16 @@ async function close() {
   console.log('🔌 Database connection pool closed');
 }
 
-// Export functions
+// // Export functions
+// module.exports = {
+//   connect,
+//   query,
+//   pool,
+//   close
+// };
+
 module.exports = {
-  connect,
-  query,
-  pool,
-  close
+  query: (text, params) => pool.query(text, params),
+  connect: () => pool.connect(),  
+  pool: pool
 };

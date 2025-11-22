@@ -36,7 +36,7 @@ class QAAgencyService {
         throw new Error('No available QA agency found for this product type');
       }
 
-      return result.rows;
+      return result.rows[0];
 
     } catch (error) {
       console.error('Error finding QA agency:', error);
@@ -49,6 +49,9 @@ class QAAgencyService {
    */
   async assignBatchToQA(batchId, qaAgencyId, priority = 'normal') {
     try {
+      if (!batchId || !qaAgencyId) {
+      throw new Error('batchId and qaAgencyId are required');
+    }
       // Create inspection request
       const requestResult = await db.query(`
         INSERT INTO inspection_requests (
@@ -61,7 +64,7 @@ class QAAgencyService {
         RETURNING *
       `, [batchId, qaAgencyId, priority]);
 
-      const request = requestResult.rows;
+      const request = requestResult.rows[0];
 
       // Update batch status to 'assigned'
       await db.query(`
@@ -84,7 +87,7 @@ class QAAgencyService {
 
       if (qaResult.rows.length > 0) {
         await this.createNotification(
-          qaResult.rows.user_id,
+          qaResult.rows[0].user_id,
           'New Inspection Request',
           `You have been assigned a new batch (ID: ${batchId}) for quality inspection.`,
           'info',

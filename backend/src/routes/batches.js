@@ -7,17 +7,27 @@ const fileService = require('../services/fileService');
 const qaAgencyService = require('../services/qaAgencyService');
 
 
-
-// Create batch with attachments
-router.post('/', 
-  verifyToken, 
-  requireRole('exporter'), 
-  uploadBatchAttachments,
+router.post(
+  '/',
+  verifyToken,
+  requireRole('user'),
+  (req, res, next) => {
+    // Check if it's a multipart/form-data (file upload) request
+    if (req.is('multipart/form-data')) {
+      // Let the file upload middleware process the request
+      uploadBatchAttachments(req, res, function (err) {
+        if (err) return next(err);
+        next();
+      });
+    } else {
+      next();
+    }
+  },
   async (req, res, next) => {
+    // const client = await db.connect();
     try {
       const { productType, quantity, unit, destination, description } = req.body;
 
-      // Validate required fields
       if (!productType || !quantity) {
         return res.status(400).json({
           success: false,
@@ -25,30 +35,28 @@ router.post('/',
         });
       }
 
-      // Create batch record
+      // client.query('BEGIN');
+      // Create batch
       const batchResult = await db.query(
-        `INSERT INTO batches (exporter_id, product_type, quantity, unit, destination, description) 
-         VALUES ($1, $2, $3, $4, $5, $6) 
-         RETURNING *`,
+        `INSERT INTO batches (exporter_id, product_type, quantity, unit, destination, description)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING *`,
         [req.user.id, productType, quantity, unit || 'kg', destination, description]
       );
+      const batch = batchResult.rows[0] || batchResult.rows;
 
-      const batch = batchResult.rows;
-
-      // Process and store file attachments
+      // If files exist, process
       const attachments = [];
       if (req.files && req.files.length > 0) {
         for (const file of req.files) {
           try {
-            // Process image if needed
             await fileService.processImage(file.path, file.filename);
 
-            // Store attachment info in database
             const attachmentResult = await db.query(
-              `INSERT INTO batch_attachments 
-               (batch_id, file_name, file_url, file_type, file_size, original_name, uploaded_by) 
-               VALUES ($1, $2, $3, $4, $5, $6, $7) 
-               RETURNING *`,
+              `INSERT INTO batch_attachments
+                (batch_id, file_name, file_url, file_type, file_size, original_name, uploaded_by)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                RETURNING *`,
               [
                 batch.id,
                 file.filename,
@@ -59,23 +67,25 @@ router.post('/',
                 req.user.id
               ]
             );
-
-            attachments.push(attachmentResult.rows);
-
+            attachments.push(attachmentResult.rows[0]);
           } catch (error) {
             console.error('Error storing attachment:', error);
-            // Continue with other files if one fails
           }
         }
       }
 
-      res.status(201).json({
+      await qaAgencyService.autoAssignBatch(batch);
+
+      // await client.query('COMMIT');
+
+      return res.status(201).json({
         success: true,
-        message: 'Batch submitted successfully with attachments',
-        data: {
-          batch,
-          attachments
-        }
+        message: attachments.length
+          ? 'Batch submitted successfully with attachments'
+          : 'Batch created successfully',
+        data: attachments.length
+          ? { batch, attachments }
+          : batch
       });
 
     } catch (err) {

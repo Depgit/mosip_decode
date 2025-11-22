@@ -27,8 +27,8 @@ router.post('/issue', verifyToken, requireRole('qa_agency', 'admin'), async (req
       });
     }
 
-    const batch = batchResult.rows;
-    const inspection = inspectionResult.rows;
+    const batch = batchResult.rows[0];
+    const inspection = inspectionResult.rows[0];
 
     // Issue VC using Inji service
     const vcResult = await injiService.issueCredential(batch, inspection);
@@ -60,7 +60,7 @@ router.post('/issue', verifyToken, requireRole('qa_agency', 'admin'), async (req
       success: true,
       message: 'Verifiable Credential issued successfully',
       data: {
-        vcId: dbResult.rows.id,
+        vcId: dbResult.rows[0].id,
         batchId,
         qrCode: qrResult.qrImage,
         issuedAt: dbResult.rows.issued_at,
