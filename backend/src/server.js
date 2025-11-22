@@ -12,14 +12,6 @@ async function startServer() {
     
     // Start Express server
     app.listen(PORT, () => {
-      console.log('\n╔════════════════════════════════════════════╗');
-      console.log('║  🌾 AgriQCert Backend Server Started       ║');
-      console.log('║  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━    ║');
-      console.log(`║  📍 Port: ${PORT}                             ║`);
-      console.log(`║  🌍 Environment: ${process.env.NODE_ENV || 'development'}               ║`);
-      console.log('║  💾 Database: Connected                    ║');
-      console.log('║  ✅ Status: Ready                          ║');
-      console.log('╚════════════════════════════════════════════╝\n');
       console.log(`🔗 API URL: http://localhost:${PORT}`);
       console.log(`🏥 Health Check: http://localhost:${PORT}/health\n`);
     });
