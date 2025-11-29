@@ -27,10 +27,10 @@ async function connect() {
     const result = await client.query('SELECT NOW()');
     console.log('✅ Database connected successfully at:', result.rows.now);
     client.release();
-    
+
     // Initialize tables after connection
     await initializeTables();
-    
+
     return true;
   } catch (err) {
     console.error('❌ Database connection failed:', err.message);
@@ -52,12 +52,12 @@ async function query(text, params = []) {
   try {
     const result = await pool.query(text, params);
     const duration = Date.now() - start;
-    
+
     // Log slow queries (performance monitoring)
     if (duration > 1000) {
       console.warn(`⚠️ Slow query detected (${duration}ms):\n${text.substring(0, 100)}...`);
     }
-    
+
     return result;
   } catch (err) {
     console.error('❌ Query error:', err.message);
@@ -71,7 +71,7 @@ async function query(text, params = []) {
  */
 async function initializeTables() {
   console.log('🔧 Initializing database tables...');
-  
+
   try {
     // Create users table
     await query(`
@@ -116,6 +116,7 @@ async function initializeTables() {
         file_type VARCHAR(50),
         file_size BIGINT,
         original_name VARCHAR(255),
+        uploaded_by INTEGER REFERENCES users(id),
         uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -173,16 +174,6 @@ async function initializeTables() {
     `);
     console.log('✅ Audit logs table ready');
 
-    // Create indexes for performance
-    await query(`
-      CREATE INDEX IF NOT EXISTS idx_batches_exporter ON batches(exporter_id);
-      CREATE INDEX IF NOT EXISTS idx_batches_status ON batches(status);
-      CREATE INDEX IF NOT EXISTS idx_inspections_batch ON inspections(batch_id);
-      CREATE INDEX IF NOT EXISTS idx_vc_batch ON verifiable_credentials(batch_id);
-      CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
-      CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at);
-    `);
-    console.log('✅ Database indexes created');
 
     await query(`
       CREATE TABLE IF NOT EXISTS qa_agencies (
@@ -238,6 +229,34 @@ async function initializeTables() {
     `);
 
     await query(`
+      CREATE TABLE IF NOT EXISTS extracted_data (
+        id SERIAL PRIMARY KEY,
+        attachment_id INTEGER REFERENCES batch_attachments(id) ON DELETE CASCADE,
+        batch_id INTEGER REFERENCES batches(id) ON DELETE CASCADE,
+        document_type VARCHAR(50),
+        moisture_level DECIMAL(5,2),
+        pesticide_content DECIMAL(8,3),
+        pesticide_unit VARCHAR(20),
+        organic_status BOOLEAN,
+        iso_codes TEXT[],
+        lab_name VARCHAR(255),
+        test_date DATE,
+        batch_number VARCHAR(100),
+        certificate_number VARCHAR(100),
+        expiry_date DATE,
+        raw_extracted_text TEXT,
+        extracted_entities JSONB,
+        confidence_score DECIMAL(3,2),
+        extraction_method VARCHAR(50),
+        status VARCHAR(50) DEFAULT 'completed',
+        error_message TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Extracted data table ready');
+
+    await query(`
       CREATE TABLE IF NOT EXISTS verifiable_credentials (
         id SERIAL PRIMARY KEY,
         batch_id INTEGER NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
@@ -252,13 +271,23 @@ async function initializeTables() {
     `);
 
     await query(`
+      CREATE INDEX IF NOT EXISTS idx_batches_exporter ON batches(exporter_id);
+      CREATE INDEX IF NOT EXISTS idx_batches_status ON batches(status);
+      CREATE INDEX IF NOT EXISTS idx_inspections_batch ON inspections(batch_id);
+      CREATE INDEX IF NOT EXISTS idx_vc_batch ON verifiable_credentials(batch_id);
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at);
       CREATE INDEX IF NOT EXISTS idx_inspection_requests_batch ON inspection_requests(batch_id);
       CREATE INDEX IF NOT EXISTS idx_inspection_requests_qa ON inspection_requests(qa_agency_id);
       CREATE INDEX IF NOT EXISTS idx_inspection_requests_status ON inspection_requests(status);
       CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
       CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
       CREATE INDEX IF NOT EXISTS idx_qa_agencies_status ON qa_agencies(status);
+      CREATE INDEX IF NOT EXISTS idx_extracted_data_attachment ON extracted_data(attachment_id);
+      CREATE INDEX IF NOT EXISTS idx_extracted_data_batch ON extracted_data(batch_id);
     `);
+    console.log('✅ Database indexes created');
+
 
     console.log('✅ Quality check tables ready');
 
@@ -279,15 +308,15 @@ async function close() {
 }
 
 // // Export functions
-// module.exports = {
-//   connect,
-//   query,
-//   pool,
-//   close
-// };
-
 module.exports = {
-  query: (text, params) => pool.query(text, params),
-  connect: () => pool.connect(),  
-  pool: pool
+  connect,
+  query,
+  pool,
+  close
 };
+
+// module.exports = {
+//   query: (text, params) => pool.query(text, params),
+//   connect: () => pool.connect(),
+//   pool: pool
+// };

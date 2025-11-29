@@ -22,6 +22,7 @@ app.use('/api/inspections', require('./routes/inspections'));
 app.use('/api/vc', require('./routes/vc'));
 app.use('/api/qa', require('./routes/qaAgency'));
 app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/extraction', require('./routes/extraction'));
 // app.use('/api/admin', require('./routes/admin'));
 
 // Health check

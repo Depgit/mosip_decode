@@ -54,6 +54,6 @@ const upload = multer({
 });
 
 // Middleware to handle multiple file uploads
-const uploadBatchAttachments = upload.array('attachments', 10); // Max 10 files
+const uploadBatchAttachments = upload.array('attachment', 10); // Max 10 files
 
 module.exports = { uploadBatchAttachments };

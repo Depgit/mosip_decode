@@ -47,6 +47,7 @@ router.post(
 
       // If files exist, process
       const attachments = [];
+      const extractions = [];
       if (req.files && req.files.length > 0) {
         for (const file of req.files) {
           try {
@@ -67,7 +68,26 @@ router.post(
                 req.user.id
               ]
             );
-            attachments.push(attachmentResult.rows[0]);
+            const attachment = attachmentResult.rows[0];
+            attachments.push(attachment);
+
+            // Trigger AI extraction in background (don't wait for it)
+            console.log(`Triggering AI extraction for ${file.originalname}`);
+            const aiExtractionService = require('../services/aiExtraction');
+            aiExtractionService.processFile(
+              file.path,
+              file.originalname,
+              attachment.id,
+              batch.id
+            ).then(result => {
+              console.log(`✅ AI extraction completed for ${file.originalname}:`, result.success);
+              if (result.success) {
+                extractions.push(result);
+              }
+            }).catch(err => {
+              console.error(`❌ AI extraction failed for ${file.originalname}:`, err);
+            });
+
           } catch (error) {
             console.error('Error storing attachment:', error);
           }
@@ -223,7 +243,7 @@ router.delete('/attachment/:attachmentId', verifyToken, async (req, res, next) =
 router.get('/file/:filename', async (req, res, next) => {
   try {
     const filepath = path.join(__dirname, '../../uploads/batches', req.params.filename);
-    
+
     // Security: prevent directory traversal
     if (!filepath.startsWith(path.join(__dirname, '../../uploads/batches'))) {
       return res.status(403).json({
